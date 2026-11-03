@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{color-scheme:light}[hidden]{display:none!important}</style>
+<title>Biomass HPT Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout concept: dark corporate title band with the formula and tabs, then a light work surface with panels, tables and modal dialogs. */
+:root{
+  --font-body:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#F1F4F8; --surface:#FFFFFF; --surface-2:#F6F8FB; --line:#DAE0E8; --line-strong:#B9C3CF;
+  --fg:#16212C; --fg-muted:#556375;
+  --accent:#12507C; --accent-ink:#FFFFFF; --accent-soft:#E2EDF6;
+  --band:#0E2A3F; --band-fg:#FFFFFF; --band-muted:#B7C8D8; --band-mark:#7DBBE6;
+  --ok:#17703F; --ok-bg:#E2F3E9; --warn:#7A4E00; --warn-bg:#FFF0CF; --crit:#B0241C; --crit-bg:#FCE6E4;
+  --shadow:0 12px 40px rgba(10,24,38,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D141B; --surface:#151E28; --surface-2:#1A2531; --line:#283544; --line-strong:#3A4A5C;
+    --fg:#E5EBF2; --fg-muted:#9BA9B9;
+    --accent:#6FB5E3; --accent-ink:#0B1722; --accent-soft:#193044;
+    --band:#091822; --band-fg:#FFFFFF; --band-muted:#9DB2C5; --band-mark:#6FB5E3;
+    --ok:#5FCB93; --ok-bg:#11301F; --warn:#F2C062; --warn-bg:#392B0B; --crit:#FF8D84; --crit-bg:#3C1815;
+    --shadow:0 12px 40px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D141B; --surface:#151E28; --surface-2:#1A2531; --line:#283544; --line-strong:#3A4A5C;
+  --fg:#E5EBF2; --fg-muted:#9BA9B9;
+  --accent:#6FB5E3; --accent-ink:#0B1722; --accent-soft:#193044;
+  --band:#091822; --band-fg:#FFFFFF; --band-muted:#9DB2C5; --band-mark:#6FB5E3;
+  --ok:#5FCB93; --ok-bg:#11301F; --warn:#F2C062; --warn-bg:#392B0B; --crit:#FF8D84; --crit-bg:#3C1815;
+  --shadow:0 12px 40px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5;margin:0}
+body.lock{overflow:hidden}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* Title band */
+.top{background:var(--band);color:var(--band-fg)}
+.top .wrap{padding-block:22px 0}
+.top h1{font-size:22px;font-weight:700;letter-spacing:.01em;text-wrap:balance}
+.formula{margin-top:6px;font-family:var(--font-mono);font-size:13px;color:var(--band-muted);overflow-wrap:anywhere}
+.tabs{display:flex;gap:4px;margin-top:18px;flex-wrap:wrap}
+.tab{background:none;border:0;border-bottom:3px solid transparent;color:var(--band-muted);padding:10px 14px 9px;min-height:44px;cursor:pointer;font-weight:600;font-size:14.5px;display:inline-flex;align-items:center;gap:8px}
+.tab:hover{color:var(--band-fg)}
+.tab[aria-selected="true"]{color:var(--band-fg);border-bottom-color:var(--band-mark)}
+.tab .count{font-family:var(--font-mono);font-size:12px;background:rgba(255,255,255,.14);border-radius:999px;padding:1px 8px}
+.top :focus-visible{outline-color:#fff}
+
+main{padding-block:24px 64px}
+.stack{display:flex;flex-direction:column;gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0}
+.panel-pad{padding:18px 20px}
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)}
+.sec-head h2{font-size:16px;font-weight:700}
+.sec-head .sub{color:var(--fg-muted);font-size:13px;margin-top:2px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{color:var(--fg-muted);font-size:13px;padding:12px 20px;border-top:1px solid var(--line);background:var(--surface-2);border-radius:0 0 8px 8px}
+
+/* Rate and stats */
+.top-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:20px}
+@media (max-width:820px){.top-grid{grid-template-columns:minmax(0,1fr)}}
+label.lbl{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.inp-group{display:flex;align-items:stretch;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);overflow:hidden}
+.inp-group:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.inp-group[data-invalid="true"]{border-color:var(--crit)}
+.inp-group input{flex:1;min-width:0;border:0;background:transparent;padding:0 12px;min-height:46px;outline:none}
+.inp-group .affix{display:flex;align-items:center;padding:0 12px;color:var(--fg-muted);background:var(--surface-2);font-size:13px;font-family:var(--font-mono)}
+.inp-group .affix.pre{border-right:1px solid var(--line)}
+.inp-group .affix.suf{border-left:1px solid var(--line)}
+.rate-input input{font-family:var(--font-mono);font-size:22px;font-weight:500}
+.hint{font-size:12.5px;color:var(--fg-muted);margin-top:6px}
+.err{font-size:12.5px;color:var(--crit);margin-top:6px;font-weight:500}
+.err:empty{display:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0}
+.stat{padding:18px 20px;border-right:1px solid var(--line);min-width:0}
+.stat:last-child{border-right:0}
+.stat .k{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-muted);font-weight:600}
+.stat .v{font-family:var(--font-mono);font-size:22px;font-weight:500;margin-top:4px;overflow-wrap:anywhere}
+.stat .s{font-size:13px;color:var(--fg-muted);overflow-wrap:anywhere}
+@media (max-width:560px){.stat{border-right:0;border-bottom:1px solid var(--line)}.stat:last-child{border-bottom:0}}
+
+/* Tables */
+.scroll{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-muted);font-weight:600;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover td{background:var(--surface-2)}
+.tbl .num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl th.num{text-align:right}
+.tbl .no{width:56px;color:var(--fg-muted);font-family:var(--font-mono)}
+.tbl .strong{font-weight:600}
+.tbl .act{text-align:right;white-space:nowrap}
+.tbl .act .btn+.btn{margin-left:6px}
+.tbl td.wrapcell{overflow-wrap:anywhere}
+.empty{padding:28px 20px;color:var(--fg-muted);text-align:center}
+.empty .btn{margin-top:12px}
+
+/* Buttons */
+.btn{min-height:44px;padding:0 16px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--fg);font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--fg-muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover:not(:disabled){background:var(--accent);filter:brightness(1.08);border-color:var(--accent)}
+.btn.danger{color:var(--crit);border-color:var(--crit)}
+.btn.danger.solid{background:var(--crit);color:#fff;border-color:var(--crit)}
+.btn.danger.solid:hover:not(:disabled){background:var(--crit);filter:brightness(1.08)}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.search{min-width:0;width:240px;max-width:100%}
+.search input{min-height:44px}
+
+/* Pills and notices */
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--surface-2);color:var(--fg-muted);border:1px solid var(--line);white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.pill.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.pill.crit{background:var(--crit-bg);color:var(--crit);border-color:transparent}
+.notice{border-radius:8px;padding:12px 16px;font-size:14px;background:var(--warn-bg);color:var(--warn)}
+.notice.crit{background:var(--crit-bg);color:var(--crit)}
+.notice p+p{margin-top:4px}
+
+/* History */
+.hist{border-bottom:1px solid var(--line)}
+.hist:last-child{border-bottom:0}
+.hist summary{list-style:none;cursor:pointer;padding:14px 20px;display:flex;gap:6px 16px;flex-wrap:wrap;align-items:baseline;min-height:44px}
+.hist summary::-webkit-details-marker{display:none}
+.hist summary::before{content:"+";font-family:var(--font-mono);width:14px;color:var(--fg-muted)}
+.hist[open] summary::before{content:"-"}
+.hist .when{font-weight:600}
+.hist .meta{color:var(--fg-muted);font-size:13px;font-family:var(--font-mono)}
+.hist .hnote{color:var(--fg-muted);font-size:13px;overflow-wrap:anywhere}
+.hist .hbody{padding:0 20px 18px}
+.hist .hbody .tools{margin-top:12px}
+.hist .hbody .scroll{border:1px solid var(--line);border-radius:6px}
+
+/* Modal */
+#modalRoot[hidden]{display:none}
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(8,18,28,.6);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.modal{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:10px;width:min(520px,100%);max-height:100%;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.modal.wide{width:min(860px,100%)}
+.m-head{padding:18px 22px 4px}
+.m-head h2{font-size:18px;font-weight:700}
+.m-body{padding:12px 22px 6px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;min-height:0}
+.m-foot{padding:14px 22px 18px;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.field .inp-group input,.field input.plain{min-height:46px}
+input.plain{width:100%;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);padding:0 12px}
+input.plain[aria-invalid="true"]{border-color:var(--crit)}
+.preview{font-size:13.5px;background:var(--accent-soft);border-radius:6px;padding:10px 12px;color:var(--fg)}
+.preview:empty{display:none}
+.preview b{font-family:var(--font-mono)}
+.warnline{font-size:12.5px;color:var(--warn);margin-top:6px;font-weight:500}
+.warnline:empty{display:none}
+.opts{display:flex;flex-direction:column;gap:10px;border:0;padding:0;margin:0;min-width:0}
+.opts legend{font-size:13px;font-weight:600;padding:0;margin-bottom:8px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.opt input{margin-top:4px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+.opt .t{font-weight:600}
+.opt .d{font-size:13px;color:var(--fg-muted)}
+.ack{display:flex;gap:10px;align-items:flex-start;margin-top:8px;font-size:14px;cursor:pointer}
+.ack input{margin-top:3px;accent-color:var(--crit);width:16px;height:16px;flex:none}
+.link{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;padding:0;font-weight:600}
+.counts{display:flex;gap:8px;flex-wrap:wrap}
+.prev-scroll{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.prev-scroll .tbl th{position:sticky;top:0}
+.filemeta{font-size:13.5px;color:var(--fg-muted);overflow-wrap:anywhere}
+
+/* Toast */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:8px;font-size:14px;font-weight:500;max-width:min(560px,calc(100% - 32px));box-shadow:var(--shadow)}
+#toast[hidden]{display:none}
+@media (prefers-reduced-motion:no-preference){.overlay{animation:fade .15s ease-out}@keyframes fade{from{opacity:0}to{opacity:1}}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>Biomass HPT Calculator</h1>
+    <p class="formula" id="formulaText"></p>
+    <div class="tabs" role="tablist" aria-label="Main sections">
+      <button class="tab" role="tab" id="tab-calc" aria-controls="panel-calc" aria-selected="true" data-tab="calc">HPT Calculator</button>
+      <button class="tab" role="tab" id="tab-master" aria-controls="panel-master" aria-selected="false" data-tab="master" tabindex="-1">Biomass Master Data <span class="count" id="masterCount">0</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="storageNotice" class="notice" hidden style="margin-bottom:20px">
+    <p><strong>Browser storage is not available.</strong> Changes work in this session only and will be lost when you close or refresh the page. Use Export Excel to keep a copy.</p>
+  </div>
+
+  <!-- Tab 1 -->
+  <section id="panel-calc" role="tabpanel" aria-labelledby="tab-calc" class="stack">
+    <div class="top-grid">
+      <div class="panel panel-pad">
+        <label class="lbl" for="rateInput">USD Exchange Rate</label>
+        <div class="inp-group rate-input" id="rateGroup">
+          <span class="affix pre">Rp</span>
+          <input id="rateInput" type="text" inputmode="decimal" autocomplete="off" aria-describedby="rateHint rateErr">
+          <span class="affix suf">per USD</span>
+        </div>
+        <p class="hint" id="rateHint">Indonesian format, for example 16.500 or 16.500,50. Every HPT updates as you type.</p>
+        <p class="err" id="rateErr" role="alert"></p>
+      </div>
+      <div class="panel stats" id="stats"></div>
+    </div>
+
+    <div class="panel">
+      <div class="sec-head">
+        <div>
+          <h2>HPT Calculation Results</h2>
+          <p class="sub" id="resultsSub"></p>
+        </div>
+        <div class="tools">
+          <button class="btn" data-act="save-history" id="btnSaveHistory">Save to History</button>
+          <button class="btn primary" data-act="export-results" id="btnExportResults">Export Results to Excel</button>
+        </div>
+      </div>
+      <div class="scroll" id="resultsWrap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="sec-head">
+        <div>
+          <h2>Calculation Breakdown</h2>
+          <p class="sub">Each step of the formula for every biomass type.</p>
+        </div>
+      </div>
+      <div class="scroll" id="breakdownWrap"></div>
+      <p class="note">Intermediate values are shown rounded for reading only. The calculation uses full precision, and only the final HPT is rounded to the nearest Rupiah.</p>
+    </div>
+
+    <div class="panel">
+      <div class="sec-head">
+        <div>
+          <h2>Saved Calculations</h2>
+          <p class="sub">Snapshots keep the rate, GCV values and HPT as they were when saved. Later master data changes do not affect them.</p>
+        </div>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <!-- Tab 2 -->
+  <section id="panel-master" role="tabpanel" aria-labelledby="tab-master" class="stack" hidden>
+    <div class="panel">
+      <div class="sec-head">
+        <div>
+          <h2>Biomass Master Data</h2>
+          <p class="sub">Setting GCV in kcal/kg. Changes update the HPT Calculator right away.</p>
+        </div>
+        <div class="tools">
+          <div class="inp-group search"><input id="filterInput" type="search" placeholder="Search biomass type" aria-label="Search biomass type" autocomplete="off"></div>
+          <button class="btn" data-act="import-master">Import Excel</button>
+          <button class="btn" data-act="export-master" id="btnExportMaster">Export Excel</button>
+          <button class="btn primary" data-act="add">+ Add Biomass</button>
+        </div>
+      </div>
+      <div class="scroll" id="masterWrap"></div>
+      <p class="note">Master data is stored in this browser only. Use Export Excel to back it up or move it to another browser or device.</p>
+    </div>
+  </section>
+</main>
+
+<input type="file" id="fileImport" accept=".xlsx,.xls,.csv" hidden>
+<div id="modalRoot" hidden></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+/*CORE-START*/
+var REF_GCV = 6322;      // reference GCV in the formula (6.322)
+var BASE_USD = 70;       // base value in the formula
+var FACTOR = 1.2;        // multiplier in the formula (1,2)
+var DEFAULT_RATE = 16500;
+var MIN_GCV = 100;
+var DEFAULT_BIOMASS = [
+  ['Sawdust', 3009], ['Woodchip', 3487], ['Cangkang Sawit', 3950], ['Pelet Tangkos', 3950],
+  ['Sekam Padi', 3200], ['Pelet Sekam', 3500], ['Bonggol Jagung', 3487]
+];
+
+function groupInt(s){ return s.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+// Indonesian format: dot for thousands, comma for decimals.
+function fmtNum(n, dec){
+  var neg = n < 0, s = Math.abs(n).toFixed(dec), p = s.split('.');
+  return (neg ? '-' : '') + groupInt(p[0]) + (p[1] ? ',' + p[1] : '');
+}
+function fmtFlex(n){
+  var r = +Number(n).toFixed(4), p = String(r).split('.');
+  return groupInt(p[0]) + (p[1] ? ',' + p[1] : '');
+}
+function parseId(str){
+  var s = String(str).trim().replace(/\s+/g, '');
+  if (!s) return { ok: false, error: 'empty' };
+  if (!/^(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$/.test(s)) return { ok: false, error: 'format' };
+  var v = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  if (!isFinite(v)) return { ok: false, error: 'format' };
+  return { ok: true, value: v };
+}
+function normName(s){ return String(s == null ? '' : s).trim().replace(/\s+/g, ' '); }
+function nameKey(s){ return normName(s).toLowerCase(); }
+function checkGcv(v){
+  if (!(v > 0)) return 'Setting GCV must be a positive number.';
+  if (v < MIN_GCV) return 'Value is too small for kcal/kg. Enter the full value, for example 3.009.';
+  return '';
+}
+function gcvWarn(v){
+  return (v < 1000 || v > 9000) ? 'Unusual for biomass. Check that the value is in kcal/kg.' : '';
+}
+var FORMAT_MSG = 'Use Indonesian number format, for example 3.009 or 3.009,5. Thousands use a dot and decimals use a comma.';
+function gcvFromText(text){
+  var p = parseId(text);
+  if (!p.ok) return { error: p.error === 'empty' ? 'Setting GCV is required.' : FORMAT_MSG };
+  var e = checkGcv(p.value);
+  if (e) return { error: e };
+  return { value: p.value, warning: gcvWarn(p.value) };
+}
+function rateFromText(text){
+  var p = parseId(text);
+  if (!p.ok) return { error: p.error === 'empty' ? 'Enter the USD exchange rate.' : 'Use Indonesian number format, for example 16.500 or 16.500,50.' };
+  if (!(p.value > 0)) return { error: 'The exchange rate must be a positive number.' };
+  return { value: p.value };
+}
+function checkName(raw, list, ignoreId){
+  var n = normName(raw);
+  if (!n) return 'Biomass Type is required.';
+  if (n.length > 60) return 'Biomass Type must be 60 characters or fewer.';
+  var k = n.toLowerCase();
+  for (var i = 0; i < list.length; i++){
+    if (list[i].id !== ignoreId && nameKey(list[i].name) === k) return 'This biomass type already exists. Duplicate names are not allowed.';
+  }
+  return '';
+}
+// Full precision throughout. Only the final HPT is rounded.
+function calcHPT(gcv, rate){
+  var ratio = gcv / REF_GCV;
+  var usd = BASE_USD * ratio;
+  var idr = usd * rate;
+  var raw = idr * FACTOR;
+  return { ratio: ratio, usd: usd, idr: idr, raw: raw, hpt: Math.round(raw) };
+}
+function findHeader(rows){
+  for (var i = 0; i < Math.min(rows.length, 15); i++){
+    var r = rows[i].map(function(c){ return String(c).toLowerCase().trim(); });
+    var g = -1, n = -1;
+    for (var j = 0; j < r.length; j++){ if (g < 0 && /gcv/.test(r[j])) g = j; }
+    for (var k = 0; k < r.length; k++){ if (n < 0 && k !== g && /biomass|jenis|nama|name|type/.test(r[k])) n = k; }
+    if (g >= 0 && n >= 0) return { index: i, nameCol: n, gcvCol: g };
+  }
+  return null;
+}
+function evalImportRows(parsed, existing){
+  var seen = {}, exKeys = {};
+  existing.forEach(function(m){ exKeys[nameKey(m.name)] = true; });
+  return parsed.map(function(r){
+    var out = { row: r.row, name: normName(r.name), gcv: null, status: 'new', messages: [], warning: '' };
+    var ne = !out.name ? 'Biomass Type is empty.' : (out.name.length > 60 ? 'Biomass Type is longer than 60 characters.' : '');
+    var ge = '';
+    if (typeof r.gcvCell === 'number'){
+      if (!isFinite(r.gcvCell)) ge = 'Setting GCV is not a valid number.';
+      else { ge = checkGcv(r.gcvCell); if (!ge){ out.gcv = r.gcvCell; out.warning = gcvWarn(r.gcvCell); } }
+    } else {
+      var g = gcvFromText(String(r.gcvCell));
+      if (g.error) ge = g.error; else { out.gcv = g.value; out.warning = g.warning; }
+    }
+    if (ne || ge){ out.status = 'invalid'; out.messages = [ne, ge].filter(Boolean); return out; }
+    var k = nameKey(out.name);
+    if (seen[k]){ out.status = 'dup_file'; out.messages = ['Same name as row ' + seen[k] + ' in this file.']; return out; }
+    seen[k] = r.row;
+    out.status = exKeys[k] ? 'exists' : 'new';
+    return out;
+  });
+}
+/*CORE-END*/
+
+/* ---------- helpers ---------- */
+function $(sel, root){ return (root || document).querySelector(sel); }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+function dateStamp(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function fmtDate(iso){
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  try { return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }); }
+  catch (e) { return dateStamp(d) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+}
+
+/* ---------- storage (localStorage, with an in-memory fallback) ---------- */
+var K_MASTER = 'biomassHpt.master.v1', K_RATE = 'biomassHpt.rate.v1', K_HIST = 'biomassHpt.history.v1', K_TAB = 'biomassHpt.tab.v1';
+var storageOk = true, mem = {};
+function sget(k){
+  try { return window.localStorage.getItem(k); }
+  catch (e) { storageOk = false; return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; }
+}
+function sset(k, v){
+  mem[k] = v;
+  try { window.localStorage.setItem(k, v); return true; }
+  catch (e) { storageOk = false; return false; }
+}
+function readJSON(k){
+  var raw = sget(k);
+  if (raw === null || raw === undefined) return { state: 'missing' };
+  try { return { state: 'ok', value: JSON.parse(raw) }; }
+  catch (e) { sset(k + '.corrupt', raw); return { state: 'corrupt' }; }
+}
+function loadMaster(){
+  var r = readJSON(K_MASTER);
+  if (r.state === 'ok' && Array.isArray(r.value)){
+    var seen = {}, out = [];
+    r.value.forEach(function(x){
+      if (x && typeof x.name === 'string' && typeof x.gcv === 'number' && x.gcv > 0){
+        var k = nameKey(x.name);
+        if (!k || seen[k]) return;
+        seen[k] = true;
+        out.push({ id: typeof x.id === 'string' ? x.id : uid(), name: normName(x.name), gcv: x.gcv });
+      }
+    });
+    return out; // an empty list stays empty: defaults are only seeded on first use
+  }
+  var seeded = DEFAULT_BIOMASS.map(function(d){ return { id: uid(), name: d[0], gcv: d[1] }; });
+  sset(K_MASTER, JSON.stringify(seeded));
+  return seeded;
+}
+function loadRate(){
+  var r = readJSON(K_RATE);
+  return (r.state === 'ok' && typeof r.value === 'number' && r.value > 0) ? r.value : DEFAULT_RATE;
+}
+function loadHistory(){
+  var r = readJSON(K_HIST);
+  if (r.state !== 'ok' || !Array.isArray(r.value)) return [];
+  return r.value.filter(function(h){
+    return h && typeof h.id === 'string' && typeof h.rate === 'number' && Array.isArray(h.rows);
+  });
+}
+
+var S = {
+  tab: 'calc',
+  master: loadMaster(),
+  rate: loadRate(),
+  rateError: '',
+  history: loadHistory(),
+  filter: '',
+  imp: null
+};
+(function(){ var t = sget(K_TAB); if (t === 'calc' || t === 'master') S.tab = t; })();
+
+function saveMaster(){ sset(K_MASTER, JSON.stringify(S.master)); }
+function saveHistory(){ sset(K_HIST, JSON.stringify(S.history)); }
+
+/* ---------- derived data: always read from the master data ---------- */
+function computeRows(){
+  return S.master.map(function(m, i){
+    var c = calcHPT(m.gcv, S.rate);
+    return { no: i + 1, id: m.id, name: m.name, gcv: m.gcv, ratio: c.ratio, usd: c.usd, idr: c.idr, raw: c.raw, hpt: c.hpt };
+  });
+}
+
+/* ---------- toast ---------- */
+var toastTimer = null;
+function toast(msg){
+  var t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.hidden = true; }, 4200);
+}
+
+/* ---------- rendering ---------- */
+function renderNotice(){ $('#storageNotice').hidden = storageOk; }
+
+function renderTabs(){
+  ['calc', 'master'].forEach(function(t){
+    var on = S.tab === t;
+    var b = $('#tab-' + t);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+    b.tabIndex = on ? 0 : -1;
+    $('#panel-' + t).hidden = !on;
+  });
+  $('#masterCount').textContent = S.master.length;
+}
+
+function renderCalc(){
+  var ok = !S.rateError;
+  var rows = computeRows();
+  var cur = function(n){ return ok ? fmtNum(n, 0) : 'n/a'; };
+
+  // stats
+  var low = null, high = null;
+  rows.forEach(function(r){ if (!low || r.hpt < low.hpt) low = r; if (!high || r.hpt > high.hpt) high = r; });
+  $('#stats').innerHTML =
+    '<div class="stat"><div class="k">Biomass types</div><div class="v">' + rows.length + '</div><div class="s">in master data</div></div>' +
+    '<div class="stat"><div class="k">Lowest HPT</div><div class="v">' + (low && ok ? 'Rp ' + cur(low.hpt) : 'n/a') + '</div><div class="s">' + (low ? esc(low.name) : 'No data') + '</div></div>' +
+    '<div class="stat"><div class="k">Highest HPT</div><div class="v">' + (high && ok ? 'Rp ' + cur(high.hpt) : 'n/a') + '</div><div class="s">' + (high ? esc(high.name) : 'No data') + '</div></div>';
+
+  $('#resultsSub').textContent = ok ? 'At Rp ' + fmtFlex(S.rate) + ' per USD, rounded to the nearest Rupiah.' : 'Fix the exchange rate to see results.';
+  $('#btnExportResults').disabled = !ok || !rows.length;
+  $('#btnSaveHistory').disabled = !ok || !rows.length;
+
+  if (!rows.length){
+    var empty = '<div class="empty"><p>No biomass types yet. Add them in Biomass Master Data to calculate HPT.</p><button class="btn primary" data-act="goto-master">Open Biomass Master Data</button></div>';
+    $('#resultsWrap').innerHTML = empty;
+    $('#breakdownWrap').innerHTML = empty;
+    return;
+  }
+
+  $('#resultsWrap').innerHTML =
+    '<table class="tbl"><thead><tr><th class="no">No.</th><th>Biomass Type</th><th class="num">Setting GCV (kcal/kg)</th><th class="num">HPT (Rp)</th></tr></thead><tbody>' +
+    rows.map(function(r){
+      return '<tr><td class="no">' + r.no + '</td><td class="wrapcell">' + esc(r.name) + '</td><td class="num">' + fmtFlex(r.gcv) + '</td><td class="num strong">' + cur(r.hpt) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+
+  var refTxt = fmtFlex(REF_GCV), facTxt = fmtFlex(FACTOR);
+  $('#breakdownWrap').innerHTML =
+    '<table class="tbl"><thead><tr><th class="no">No.</th><th>Biomass Type</th><th class="num">Setting GCV</th>' +
+    '<th class="num">GCV ÷ ' + refTxt + '</th><th class="num">× ' + BASE_USD + ' (USD)</th><th class="num">× USD rate (Rp)</th><th class="num">× ' + facTxt + ' (Rp)</th><th class="num">HPT (Rp)</th></tr></thead><tbody>' +
+    rows.map(function(r){
+      return '<tr><td class="no">' + r.no + '</td><td class="wrapcell">' + esc(r.name) + '</td><td class="num">' + fmtFlex(r.gcv) + '</td>' +
+        '<td class="num">' + fmtNum(r.ratio, 6) + '</td><td class="num">' + fmtNum(r.usd, 4) + '</td>' +
+        '<td class="num">' + (ok ? fmtNum(r.idr, 2) : 'n/a') + '</td><td class="num">' + (ok ? fmtNum(r.raw, 4) : 'n/a') + '</td>' +
+        '<td class="num strong">' + cur(r.hpt) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderMaster(){
+  var q = nameKey(S.filter);
+  var list = S.master.map(function(m, i){ return { m: m, no: i + 1 }; }).filter(function(x){ return !q || nameKey(x.m.name).indexOf(q) !== -1; });
+  $('#btnExportMaster').disabled = !S.master.length;
+  if (!S.master.length){
+    $('#masterWrap').innerHTML = '<div class="empty"><p>The master data is empty. Add a biomass type or import an Excel file.</p><button class="btn primary" data-act="add">+ Add Biomass</button></div>';
+    return;
+  }
+  if (!list.length){
+    $('#masterWrap').innerHTML = '<div class="empty"><p>No biomass type matches your search.</p></div>';
+    return;
+  }
+  $('#masterWrap').innerHTML =
+    '<table class="tbl"><thead><tr><th class="no">No.</th><th>Biomass Type</th><th class="num">Setting GCV (kcal/kg)</th><th></th></tr></thead><tbody>' +
+    list.map(function(x){
+      return '<tr><td class="no">' + x.no + '</td><td class="wrapcell">' + esc(x.m.name) + '</td><td class="num">' + fmtFlex(x.m.gcv) + '</td>' +
+        '<td class="act"><button class="btn sm" data-act="edit" data-id="' + esc(x.m.id) + '" aria-label="Edit ' + esc(x.m.name) + '">Edit</button>' +
+        '<button class="btn sm danger" data-act="delete" data-id="' + esc(x.m.id) + '" aria-label="Delete ' + esc(x.m.name) + '">Delete</button></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function histTable(rows){
+  return '<div class="scroll"><table class="tbl"><thead><tr><th class="no">No.</th><th>Biomass Type</th><th class="num">Setting GCV (kcal/kg)</th><th class="num">HPT (Rp)</th></tr></thead><tbody>' +
+    rows.map(function(r, i){
+      return '<tr><td class="no">' + (i + 1) + '</td><td class="wrapcell">' + esc(r.name) + '</td><td class="num">' + fmtFlex(r.gcv) + '</td><td class="num strong">' + fmtNum(r.hpt, 0) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function renderHistory(){
+  var el = $('#historyList');
+  if (!S.history.length){
+    el.innerHTML = '<div class="empty"><p>No saved calculations yet. Use Save to History to keep a snapshot of the current results.</p></div>';
+    return;
+  }
+  el.innerHTML = S.history.map(function(h){
+    return '<details class="hist"><summary><span class="when">' + esc(fmtDate(h.at)) + '</span>' +
+      '<span class="meta">Rp ' + fmtFlex(h.rate) + ' per USD, ' + h.rows.length + ' biomass types</span>' +
+      (h.note ? '<span class="hnote">' + esc(h.note) + '</span>' : '') + '</summary>' +
+      '<div class="hbody">' + histTable(h.rows) +
+      '<div class="tools"><button class="btn sm" data-act="hist-export" data-id="' + esc(h.id) + '">Export to Excel</button>' +
+      '<button class="btn sm danger" data-act="hist-delete" data-id="' + esc(h.id) + '">Delete snapshot</button></div></div></details>';
+  }).join('');
+}
+
+function renderAll(){ renderNotice(); renderTabs(); renderCalc(); renderMaster(); renderHistory(); }
+function afterMasterChange(){ saveMaster(); renderAll(); }
+
+/* ---------- tabs ---------- */
+function setTab(t){
+  S.tab = t; sset(K_TAB, t); renderTabs();
+}
+
+/* ---------- modal ---------- */
+var lastFocus = null;
+function showModal(html, wide){
+  lastFocus = document.activeElement;
+  var root = $('#modalRoot');
+  root.innerHTML = '<div class="overlay"><div class="modal' + (wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-labelledby="mTitle">' + html + '</div></div>';
+  root.hidden = false;
+  document.body.classList.add('lock');
+  var f = root.querySelector('[data-autofocus]') || root.querySelector('button, input');
+  if (f) f.focus();
+}
+function closeModal(){
+  var root = $('#modalRoot');
+  root.innerHTML = ''; root.hidden = true;
+  document.body.classList.remove('lock');
+  S.imp = null;
+  if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }
+}
+$('#modalRoot').addEventListener('keydown', function(e){
+  if (e.key === 'Escape'){ e.preventDefault(); closeModal(); return; }
+  if (e.key === 'Tab'){
+    var f = Array.prototype.slice.call($('#modalRoot').querySelectorAll('button:not([disabled]), input:not([disabled]), summary, a[href]'));
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  }
+});
+function showMessage(title, text){
+  showModal('<div class="m-head"><h2 id="mTitle">' + esc(title) + '</h2></div><div class="m-body"><p>' + esc(text) + '</p></div>' +
+    '<div class="m-foot"><button class="btn primary" data-act="close" data-autofocus>OK</button></div>');
+}
+
+/* Add / edit form */
+function openForm(id){
+  var item = id ? S.master.find(function(m){ return m.id === id; }) : null;
+  if (id && !item) return;
+  showModal(
+    '<div class="m-head"><h2 id="mTitle">' + (item ? 'Edit Biomass' : 'Add Biomass') + '</h2></div>' +
+    '<form id="bioForm" novalidate><div class="m-body">' +
+      '<div class="field"><label class="lbl" for="fName">Biomass Type</label>' +
+        '<input class="plain" id="fName" type="text" maxlength="60" autocomplete="off" data-autofocus aria-describedby="fNameErr" value="' + esc(item ? item.name : '') + '">' +
+        '<p class="err" id="fNameErr" role="alert"></p></div>' +
+      '<div class="field"><label class="lbl" for="fGcv">Setting GCV (kcal/kg)</label>' +
+        '<div class="inp-group" id="fGcvGroup"><input id="fGcv" type="text" inputmode="decimal" autocomplete="off" aria-describedby="fGcvHint fGcvErr" value="' + esc(item ? fmtFlex(item.gcv) : '') + '"><span class="affix suf">kcal/kg</span></div>' +
+        '<p class="hint" id="fGcvHint">Indonesian format, for example 3.009 or 3.009,5.</p>' +
+        '<p class="warnline" id="fGcvWarn"></p><p class="err" id="fGcvErr" role="alert"></p></div>' +
+      '<p class="preview" id="fPreview"></p>' +
+    '</div><div class="m-foot"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary">Save</button></div></form>'
+  );
+  var form = $('#bioForm'), nameEl = $('#fName'), gcvEl = $('#fGcv'), attempted = false;
+  function validate(show){
+    var ne = checkName(nameEl.value, S.master, item ? item.id : null);
+    var g = gcvFromText(gcvEl.value);
+    var ge = g.error || '';
+    if (show){
+      $('#fNameErr').textContent = ne; nameEl.setAttribute('aria-invalid', ne ? 'true' : 'false');
+      $('#fGcvErr').textContent = ge; $('#fGcvGroup').dataset.invalid = ge ? 'true' : 'false';
+    }
+    $('#fGcvWarn').textContent = (!ge && g.warning) ? g.warning : '';
+    var pv = $('#fPreview');
+    pv.innerHTML = (!ge && !S.rateError) ? 'HPT at Rp ' + fmtFlex(S.rate) + ' per USD: <b>Rp ' + fmtNum(calcHPT(g.value, S.rate).hpt, 0) + '</b>' : '';
+    return { ne: ne, ge: ge, gcv: g.value };
+  }
+  nameEl.addEventListener('input', function(){ validate(attempted); });
+  gcvEl.addEventListener('input', function(){ validate(attempted); });
+  form.addEventListener('submit', function(e){
+    e.preventDefault(); attempted = true;
+    var v = validate(true);
+    if (v.ne){ nameEl.focus(); return; }
+    if (v.ge){ gcvEl.focus(); return; }
+    var name = normName(nameEl.value);
+    if (item){ item.name = name; item.gcv = v.gcv; toast('"' + name + '" updated. HPT results recalculated.'); }
+    else { S.master.push({ id: uid(), name: name, gcv: v.gcv }); toast('"' + name + '" added to the HPT calculation.'); }
+    closeModal(); afterMasterChange();
+  });
+  validate(false);
+}
+
+function openDelete(id){
+  var item = S.master.find(function(m){ return m.id === id; });
+  if (!item) return;
+  showModal('<div class="m-head"><h2 id="mTitle">Delete biomass?</h2></div>' +
+    '<div class="m-body"><p>Delete <strong>' + esc(item.name) + '</strong> from the master data? It will no longer appear in the HPT Calculator. Saved calculations keep their values.</p></div>' +
+    '<div class="m-foot"><button class="btn" data-act="close" data-autofocus>Cancel</button><button class="btn danger solid" id="confirmDelete">Delete</button></div>');
+  $('#confirmDelete').addEventListener('click', function(){
+    S.master = S.master.filter(function(m){ return m.id !== id; });
+    closeModal(); afterMasterChange(); toast('"' + item.name + '" deleted.');
+  });
+}
+
+function openSaveHistory(){
+  if (S.rateError || !S.master.length) return;
+  showModal('<div class="m-head"><h2 id="mTitle">Save to History</h2></div>' +
+    '<form id="histForm"><div class="m-body">' +
+      '<p>Save ' + S.master.length + ' biomass types at Rp ' + fmtFlex(S.rate) + ' per USD. The snapshot will not change when the master data changes later.</p>' +
+      '<div class="field"><label class="lbl" for="hNote">Note (optional)</label><input class="plain" id="hNote" type="text" maxlength="80" autocomplete="off" data-autofocus placeholder="For example, November purchase price"></div>' +
+    '</div><div class="m-foot"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary">Save</button></div></form>');
+  $('#histForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var note = normName($('#hNote').value);
+    var rows = computeRows().map(function(r){ return { name: r.name, gcv: r.gcv, hpt: r.hpt }; });
+    S.history.unshift({ id: uid(), at: new Date().toISOString(), rate: S.rate, note: note, formula: { base: BASE_USD, ref: REF_GCV, factor: FACTOR }, rows: rows });
+    saveHistory(); closeModal(); renderHistory(); renderNotice(); toast('Calculation saved to history.');
+  });
+}
+function openHistDelete(id){
+  var h = S.history.find(function(x){ return x.id === id; });
+  if (!h) return;
+  showModal('<div class="m-head"><h2 id="mTitle">Delete saved calculation?</h2></div>' +
+    '<div class="m-body"><p>Delete the snapshot from ' + esc(fmtDate(h.at)) + ' (Rp ' + fmtFlex(h.rate) + ' per USD)? This cannot be undone.</p></div>' +
+    '<div class="m-foot"><button class="btn" data-act="close" data-autofocus>Cancel</button><button class="btn danger solid" id="confirmHistDelete">Delete</button></div>');
+  $('#confirmHistDelete').addEventListener('click', function(){
+    S.history = S.history.filter(function(x){ return x.id !== id; });
+    saveHistory(); closeModal(); renderHistory(); toast('Snapshot deleted.');
+  });
+}
+
+/* ---------- Excel export ---------- */
+var XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+var downloadsPromise = null;
+function getDownloads(){
+  if (!downloadsPromise){
+    downloadsPromise = (window.claude && typeof window.claude.use === 'function')
+      ? Promise.resolve(window.claude.use('downloads')).catch(function(){ return null; })
+      : Promise.resolve(null);
+  }
+  return downloadsPromise;
+}
+function saveWorkbook(wb, filename){
+  if (typeof XLSX === 'undefined'){ toast('The Excel library could not be loaded. Check your connection and reload.'); return; }
+  var arr = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  var blob = new Blob([arr], { type: XLSX_MIME });
+  getDownloads().then(function(dl){
+    if (dl){
+      return dl.save({ filename: filename, data: blob }).then(function(){ toast('Saved ' + filename); }).catch(function(err){
+        if (err && err.code === 'declined') return;
+        toast('The file could not be saved (' + ((err && err.code) || 'error') + ').');
+      });
+    }
+    try {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+      toast('Exported ' + filename);
+    } catch (e) { toast('Download is not available in this view.'); }
+  });
+}
+function numFmtFor(v){ return Number.isInteger(v) ? '#,##0' : '#,##0.00'; }
+
+function buildResultsWB(items, rate, whenText, note){
+  var head = ['No.', 'Biomass Type', 'Setting GCV (kcal/kg)', 'GCV ÷ ' + fmtFlex(REF_GCV), '× ' + BASE_USD + ' (USD)', '× USD rate (Rp)', '× ' + fmtFlex(FACTOR) + ' (Rp, unrounded)', 'HPT (Rp)'];
+  var aoa = [
+    ['Biomass HPT Calculation'],
+    ['Calculated on', whenText],
+    ['USD Exchange Rate (Rp)', rate],
+    ['Formula', 'HPT = ' + BASE_USD + ' × (Setting GCV ÷ ' + fmtFlex(REF_GCV) + ') × USD rate × ' + fmtFlex(FACTOR)],
+    [note ? 'Note: ' + note : ''],
+    head
+  ];
+  items.forEach(function(it, i){ aoa.push([i + 1, it.name, it.gcv]); });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['B3'].z = '#,##0.00';
+  items.forEach(function(it, i){
+    var R = 7 + i, c = calcHPT(it.gcv, rate);
+    ws['C' + R].z = numFmtFor(it.gcv);
+    ws['D' + R] = { t: 'n', v: c.ratio, f: 'C' + R + '/' + REF_GCV, z: '0.000000' };
+    ws['E' + R] = { t: 'n', v: c.usd, f: BASE_USD + '*D' + R, z: '#,##0.0000' };
+    ws['F' + R] = { t: 'n', v: c.idr, f: 'E' + R + '*$B$3', z: '#,##0.00' };
+    ws['G' + R] = { t: 'n', v: c.raw, f: 'F' + R + '*' + FACTOR, z: '#,##0.0000' };
+    ws['H' + R] = { t: 'n', v: c.hpt, f: 'ROUND(G' + R + ',0)', z: '#,##0' };
+  });
+  ws['!ref'] = 'A1:H' + (6 + items.length);
+  ws['!cols'] = [{ wch: 8 }, { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 16 }];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'HPT Results');
+  return wb;
+}
+function exportResults(){
+  if (S.rateError || !S.master.length) return;
+  if (typeof XLSX === 'undefined'){ toast('The Excel library could not be loaded. Check your connection and reload.'); return; }
+  var now = new Date();
+  var items = S.master.map(function(m){ return { name: m.name, gcv: m.gcv }; });
+  saveWorkbook(buildResultsWB(items, S.rate, fmtDate(now.toISOString()), ''), 'hpt-biomass-' + dateStamp(now) + '.xlsx');
+}
+function exportHistory(id){
+  var h = S.history.find(function(x){ return x.id === id; });
+  if (!h || typeof XLSX === 'undefined'){ if (h) toast('The Excel library could not be loaded. Check your connection and reload.'); return; }
+  var items = h.rows.map(function(r){ return { name: r.name, gcv: r.gcv }; });
+  saveWorkbook(buildResultsWB(items, h.rate, fmtDate(h.at), h.note || ''), 'hpt-biomass-' + dateStamp(new Date(h.at)) + '.xlsx');
+}
+function exportMaster(){
+  if (!S.master.length) return;
+  if (typeof XLSX === 'undefined'){ toast('The Excel library could not be loaded. Check your connection and reload.'); return; }
+  var aoa = [['No.', 'Biomass Type', 'Setting GCV (kcal/kg)']];
+  S.master.forEach(function(m, i){ aoa.push([i + 1, m.name, m.gcv]); });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  S.master.forEach(function(m, i){ ws['C' + (i + 2)].z = numFmtFor(m.gcv); });
+  ws['!cols'] = [{ wch: 6 }, { wch: 30 }, { wch: 24 }];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Biomass Master');
+  saveWorkbook(wb, 'biomass-master-data-' + dateStamp(new Date()) + '.xlsx');
+}
+
+/* ---------- Excel import ---------- */
+function startImport(file){
+  if (typeof XLSX === 'undefined'){ showMessage('Excel library not loaded', 'The Excel library could not be loaded. Check your connection and reload the page.'); return; }
+  if (file.size > 5 * 1024 * 1024){ showMessage('File too large', 'Choose a file smaller than 5 MB.'); return; }
+  var isCsv = /\.csv$/i.test(file.name);
+  var reader = new FileReader();
+  reader.onerror = function(){ showMessage('Could not read the file', 'The file could not be opened. Try saving it again as .xlsx.'); };
+  reader.onload = function(){
+    var wb;
+    try { wb = XLSX.read(reader.result, { type: 'array', raw: isCsv }); }
+    catch (e) { showMessage('Could not read the file', 'This does not look like a valid Excel or CSV file.'); return; }
+    var sheetName = wb.SheetNames.indexOf('Biomass Master') !== -1 ? 'Biomass Master' : wb.SheetNames[0];
+    if (!sheetName){ showMessage('Empty workbook', 'The file has no sheets.'); return; }
+    var data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' });
+    var hdr = findHeader(data);
+    if (!hdr){
+      showMessage('Columns not found', 'The first sheet needs the columns "Biomass Type" and "Setting GCV (kcal/kg)". Export the master data from this page to get a ready template.');
+      return;
+    }
+    var parsed = [];
+    for (var i = hdr.index + 1; i < data.length; i++){
+      var row = data[i], nm = row[hdr.nameCol], gv = row[hdr.gcvCol];
+      var blankName = nm === '' || nm == null, blankGcv = gv === '' || gv == null;
+      if (blankName && blankGcv) continue;
+      parsed.push({ row: i + 1, name: nm, gcvCell: blankGcv ? '' : (typeof gv === 'number' ? gv : String(gv)) });
+    }
+    if (!parsed.length){ showMessage('No data rows', 'No biomass rows were found under the header.'); return; }
+    S.imp = { fileName: file.name, sheet: sheetName, rows: evalImportRows(parsed, S.master), mode: 'add', ack: false };
+    openImportModal();
+  };
+  reader.readAsArrayBuffer(file);
+}
+function importPlan(){
+  var imp = S.imp, rep = imp.mode === 'replace';
+  var toImport = imp.rows.filter(function(r){ return r.status === 'new' || (rep && r.status === 'exists'); });
+  return { rep: rep, toImport: toImport };
+}
+function openImportModal(){
+  var imp = S.imp;
+  showModal(
+    '<div class="m-head"><h2 id="mTitle">Import Master Data Preview</h2></div>' +
+    '<div class="m-body">' +
+      '<p class="filemeta">' + esc(imp.fileName) + ', sheet "' + esc(imp.sheet) + '", ' + imp.rows.length + ' data rows. Nothing is imported until you confirm.</p>' +
+      '<div class="counts" id="impCounts"></div>' +
+      '<fieldset class="opts"><legend>Import mode</legend>' +
+        '<label class="opt"><input type="radio" name="impMode" value="add" checked data-autofocus><span><span class="t">Add new records only</span><br><span class="d">Keeps all current records unchanged. Names that already exist are skipped, never overwritten.</span></span></label>' +
+        '<label class="opt"><input type="radio" name="impMode" value="replace"><span><span class="t">Replace all master data</span><br><span class="d">Deletes all ' + S.master.length + ' current records and uses the imported list instead.</span></span></label>' +
+      '</fieldset>' +
+      '<div id="impReplaceBox" class="notice crit" hidden>' +
+        '<p><strong>This replaces every current record.</strong> Saved calculations are not affected.</p>' +
+        '<label class="ack"><input type="checkbox" id="impAck"><span>I understand that all ' + S.master.length + ' current records will be replaced.</span></label>' +
+        '<p style="margin-top:8px"><button type="button" class="link" data-act="export-master">Export current data first as a backup</button></p>' +
+      '</div>' +
+      '<div class="prev-scroll"><table class="tbl"><thead><tr><th class="no">Row</th><th>Biomass Type</th><th class="num">Setting GCV (kcal/kg)</th><th>Status</th></tr></thead><tbody id="impBody"></tbody></table></div>' +
+    '</div>' +
+    '<div class="m-foot"><button type="button" class="btn" data-act="close">Cancel</button><button type="button" class="btn primary" id="impGo"></button></div>', true);
+  var root = $('#modalRoot');
+  root.querySelectorAll('input[name="impMode"]').forEach(function(r){
+    r.addEventListener('change', function(){ S.imp.mode = r.value; S.imp.ack = false; $('#impAck').checked = false; updateImport(); });
+  });
+  $('#impAck').addEventListener('change', function(e){ S.imp.ack = e.target.checked; updateImport(); });
+  $('#impGo').addEventListener('click', confirmImport);
+  updateImport();
+}
+function updateImport(){
+  var imp = S.imp, plan = importPlan(), rep = plan.rep;
+  var c = { n: 0, e: 0, i: 0, d: 0 };
+  imp.rows.forEach(function(r){ if (r.status === 'new') c.n++; else if (r.status === 'exists') c.e++; else if (r.status === 'invalid') c.i++; else c.d++; });
+  $('#impCounts').innerHTML =
+    '<span class="pill ok">' + c.n + ' new</span><span class="pill">' + c.e + ' already exist</span>' +
+    '<span class="pill ' + (c.i ? 'crit' : '') + '">' + c.i + ' invalid</span><span class="pill ' + (c.d ? 'warn' : '') + '">' + c.d + ' duplicate in file</span>';
+  $('#impReplaceBox').hidden = !rep;
+  $('#impBody').innerHTML = imp.rows.map(function(r){
+    var pill, notes = r.messages.slice();
+    if (r.status === 'invalid') pill = '<span class="pill crit">Invalid</span>';
+    else if (r.status === 'dup_file') pill = '<span class="pill warn">Duplicate, skipped</span>';
+    else if (r.status === 'exists') pill = rep ? '<span class="pill ok">Will import</span>' : '<span class="pill">Exists, skipped</span>';
+    else pill = '<span class="pill ok">' + (rep ? 'Will import' : 'New') + '</span>';
+    if (r.warning && (r.status === 'new' || (rep && r.status === 'exists'))) notes.push(r.warning);
+    return '<tr><td class="no">' + r.row + '</td><td class="wrapcell">' + (r.name ? esc(r.name) : '<span class="hint">(empty)</span>') + '</td><td class="num">' + (r.gcv != null ? fmtFlex(r.gcv) : '') + '</td>' +
+      '<td>' + pill + (notes.length ? '<div class="hint">' + notes.map(esc).join(' ') + '</div>' : '') + '</td></tr>';
+  }).join('');
+  var go = $('#impGo'), n = plan.toImport.length;
+  go.textContent = rep ? 'Replace all with ' + n + ' records' : 'Import ' + n + ' new records';
+  go.className = 'btn ' + (rep ? 'danger solid' : 'primary');
+  go.disabled = n === 0 || (rep && !imp.ack);
+}
+function confirmImport(){
+  var imp = S.imp, plan = importPlan();
+  if (!plan.toImport.length || (plan.rep && !imp.ack)) return;
+  var items = plan.toImport.map(function(r){ return { id: uid(), name: r.name, gcv: r.gcv }; });
+  var skipped = imp.rows.length - plan.toImport.length;
+  if (plan.rep) S.master = items; else S.master = S.master.concat(items);
+  closeModal(); afterMasterChange();
+  toast((plan.rep ? 'Master data replaced with ' : 'Imported ') + items.length + ' records' + (skipped ? ', ' + skipped + ' skipped.' : '.'));
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', function(e){
+  var tabBtn = e.target.closest('[data-tab]');
+  if (tabBtn){ setTab(tabBtn.dataset.tab); return; }
+  var b = e.target.closest('[data-act]');
+  if (!b) return;
+  var id = b.dataset.id;
+  switch (b.dataset.act){
+    case 'close': closeModal(); break;
+    case 'add': openForm(null); break;
+    case 'edit': openForm(id); break;
+    case 'delete': openDelete(id); break;
+    case 'goto-master': setTab('master'); break;
+    case 'save-history': openSaveHistory(); break;
+    case 'export-results': exportResults(); break;
+    case 'export-master': exportMaster(); break;
+    case 'import-master': $('#fileImport').click(); break;
+    case 'hist-export': exportHistory(id); break;
+    case 'hist-delete': openHistDelete(id); break;
+  }
+});
+$('.tabs').addEventListener('keydown', function(e){
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  var next = S.tab === 'calc' ? 'master' : 'calc';
+  setTab(next); $('#tab-' + next).focus();
+});
+$('#fileImport').addEventListener('change', function(e){
+  var f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (f) startImport(f);
+});
+$('#filterInput').addEventListener('input', function(e){ S.filter = e.target.value; renderMaster(); });
+
+var rateEl = $('#rateInput');
+rateEl.value = fmtFlex(S.rate);
+rateEl.addEventListener('input', function(){
+  var r = rateFromText(rateEl.value);
+  if (r.error){ S.rateError = r.error; }
+  else { S.rateError = ''; S.rate = r.value; sset(K_RATE, JSON.stringify(S.rate)); }
+  $('#rateErr').textContent = S.rateError;
+  $('#rateGroup').dataset.invalid = S.rateError ? 'true' : 'false';
+  renderCalc(); renderNotice();
+});
+rateEl.addEventListener('blur', function(){
+  if (!S.rateError) rateEl.value = fmtFlex(S.rate);
+});
+
+$('#formulaText').textContent = 'HPT = ' + BASE_USD + ' × (Setting GCV ÷ ' + fmtFlex(REF_GCV) + ') × USD rate × ' + fmtFlex(FACTOR);
+renderAll();
+})();
+</script>
+
+</body>
+</html>
